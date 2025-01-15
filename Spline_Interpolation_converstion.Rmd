@@ -1,0 +1,135 @@
+
+---
+title: "Spline Interpolation Conversion: ATQE"
+author: "Bryan Roman"
+date: "10/28/2024"
+output: pdf_document
+
+---
+
+Prep:
+  - Working directory
+  - Libaries used
+  - CSV data that was imported
+
+```{r}
+setwd("C:/Users/Roman/OneDrive/Desktop/R_Repo/ATQ_R_Repo")
+
+library(zoo)
+library(tidyverse)
+
+# There are two csv files because quarterly interval dates varied
+# Debt_To_GDP_Ratio was the outlier 
+
+data = read.csv(file = "Qart_to_Monthly.csv")
+data_Debt_To_GDP_Ratio = read.csv(file = "Debt_To_GDP_Ratio.csv")
+
+# Testing one of the variables 
+head(data_Debt_To_GDP_Ratio)
+
+```
+
+Created two sub-DataSets
+  - data_GDP_Growth
+  - data_Account_Balance
+  
+The negative number removes corresponding column. 
+```{r}
+
+data_GDP_Growth = data[,-3]
+data_Account_Balance = data[,-2]
+
+# Testing results
+head(data_GDP_Growth)
+head(data_Account_Balance)
+
+```
+
+
+This conversion allows use to repeat our time interval in the appropriate manner.
+
+  - Each variable specifies month/date/year for our date
+  - There are many ways to read a date, therefor we must specify our format
+  
+
+```{r}
+# Convert date string to Date object
+data$Date = as.Date(data$Date, format = "%m/%d/%Y")
+data_GDP_Growth$Date = as.Date(data_GDP_Growth$Date, format = "%m/%d/%Y")
+data_Account_Balance$Date = as.Date(data_Account_Balance$Date, format = "%m/%d/%Y")
+data_Debt_To_GDP_Ratio$Date = as.Date(data_Debt_To_GDP_Ratio$Date, format = "%m/%d/%Y")
+
+```
+
+
+#-------------------------------------------------------------------------------
+
+Spline Interpolation function:
+  - monthly_dates is our monthly time sequence
+  - "Value" is defualt the column name for the data
+
+```{r}
+spline_interpolation = function(data, start_date = "1995-01-01", end_date = "2024-01-01") {
+
+    monthly_dates = seq.Date(
+    from = as.Date(start_date),
+    to = as.Date(end_date),
+    by = "month"
+  )
+  
+  x = as.numeric(data$Date)
+  y = as.numeric(data[, 2])  
+  
+  spline_fit = spline(x, y, n = length(monthly_dates))
+  
+  result = data.frame(
+    Date = monthly_dates,
+    Value = spline_fit$y
+  )
+  
+  return(result)
+}
+
+```
+
+#-------------------------------------------------------------------------------
+
+We rename the default "Value" of each variable
+
+```{r}
+monthly_gdp = spline_interpolation(data_GDP_Growth)
+names(monthly_gdp)[2] = "GDP_Growth_Rate"
+
+monthly_balance = spline_interpolation(data_Account_Balance)
+names(monthly_balance)[2] = "Current_Account_Balance"
+
+monthly_ratio = spline_interpolation(data_Debt_To_GDP_Ratio)
+names(monthly_balance)[2] = "Data_Debt_To_GDP_Ratio"
+```
+
+Checking results of each variable
+
+```{r}
+
+head(monthly_gdp)
+head(monthly_balance)
+head(monthly_ratio)
+
+```
+
+Combining the variables into a complete data set
+```{r}
+complete_data_set = cbind(monthly_gdp,
+                      monthly_balance[-1],
+                      monthly_ratio[-1]
+                      )
+
+# Checking results
+head(complete_data_set)
+```
+
+Creating a new CSV file to export
+```{r}
+write.csv(complete_data_set, "Monthly_Interpolated_Data.csv", row.names = FALSE)
+
+```
